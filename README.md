@@ -74,11 +74,15 @@ For the Services Archive:
 
 Technical Notes
 
+SEO Respect: The plugin uses dedicated metaboxes for "SEO Summaries." This content is injected into the archive grids and can be automatically used to populate the main content area of single pages if the primary editor is left empty. This ensures that even quick entries have indexable, relevant text for search engines.
+
 Template Overriding: The plugin automatically takes over the layout for single Service and Project pages to ensure they match the plugin's aesthetic.
 
 Page Builders: If you use Elementor or Beaver Builder on a Service page, the plugin will step aside and let the builder handle the layout.
 
 Clean UI: The plugin hides unnecessary "Classic Editor" boxes to keep your editing experience focused.
+
+
 
 License
 
