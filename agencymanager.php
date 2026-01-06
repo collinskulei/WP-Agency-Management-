@@ -10,33 +10,44 @@ if (!defined('ABSPATH')) exit;
 
 class Agency_Service_Manager {
 
+    /**
+     * The Constructor.
+     * This is where we hook everything into WordPress. Think of it as the 
+     * project manager walking into a meeting and tellin
+     */
     public function __construct() {
-        // Core Registration
+        // Registering the heavy lifters: Post Types and Taxonomies
         add_action('init', [$this, 'register_post_types']);
         add_action('init', [$this, 'register_taxonomies']);
         
-        // Admin UI & Settings
+        // Setting up the Admin side so we actually have a UI to play with
         add_action('admin_menu', [$this, 'add_plugin_settings_menu']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('add_meta_boxes', [$this, 'add_agency_meta_boxes']);
         add_action('save_post', [$this, 'save_agency_meta']);
         
-        // Assets
+        // Bringing in the CSS and JS because a plugin without styling is just a sad list of text
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
         add_action('wp_enqueue_scripts', [$this, 'enqueue_public_assets']);
         add_action('admin_head', [$this, 'hide_classic_editor_ui']); 
 
-        // Frontend Displays
+        // Shortcodes: The magic words you drop into pages to make stuff appear
         add_shortcode('agency_projects_grid', [$this, 'render_projects_grid']);
         add_shortcode('agency_services_archive', [$this, 'render_services_archive']);
         
-        // Filters & SEO Compatibility
+        // Advanced plumbing: Template loading, file type permissions, and query tweaks
         add_filter('template_include', [$this, 'template_loader']);
         add_filter('upload_mimes', [$this, 'allow_font_uploads']);
         add_filter('the_content', [$this, 'inject_custom_meta_into_content'], 1);
         add_action('pre_get_posts', [$this, 'modify_service_archive_query']);
     }
 
+    /**
+     * Tweaks the service archive order.
+     * By default, WordPress likes to show things by date. I've told it to respect 
+     * the 'menu_order' instead, because sometimes a service from 2022 is more 
+     * important than the one we thought of yesterday.
+     */
     public function modify_service_archive_query($query) {
         if (!is_admin() && $query->is_main_query() && is_post_type_archive('agency_service')) {
             $query->set('orderby', 'menu_order');
@@ -44,6 +55,11 @@ class Agency_Service_Manager {
         }
     }
 
+    /**
+     * Cleaning up the Admin UI.
+     * The Classic Editor leaves some "excerpt" boxes that just clutter the place.
+     * We're hiding them here because we prefer a clean workspace.
+     */
     public function hide_classic_editor_ui() {
         $screen = get_current_screen();
         if ($screen && $screen->post_type === 'agency_service') {
@@ -53,6 +69,13 @@ class Agency_Service_Manager {
         }
     }
 
+    /**
+     * Content Injector.
+     * This checks if we are using a page builder like Elementor or Beaver Builder.
+     * If not, it checks if the main content area is empty and tries to fill it with 
+     * our custom meta descriptions. It's basically a fallback so the page doesn't 
+     * look like a ghost town if someone forgets to use the editor.
+     */
     public function inject_custom_meta_into_content($content) {
         if (!empty($content) && (strpos($content, 'fl-builder-content') !== false || strpos($content, 'elementor') !== false)) {
             return $content;
@@ -68,6 +91,12 @@ class Agency_Service_Manager {
         return (empty($content) && !empty($custom_content)) ? wpautop($custom_content) : $content;
     }
 
+    /**
+     * Font Uploader permissions.
+     * WordPress is historically paranoid about font files (woff, ttf).
+     * This function tells WordPress to calm down and let us upload them so 
+     * the site actually looks high-end.
+     */
     public function allow_font_uploads($mimes) {
         $mimes['woff'] = 'application/x-font-woff';
         $mimes['woff2'] = 'application/x-font-woff2';
@@ -75,6 +104,11 @@ class Agency_Service_Manager {
         return $mimes;
     }
 
+    /**
+     * Admin assets.
+     * We're loading the color picker and media uploader for the settings page.
+     * Without this, the 'Customizer' would just be a bunch of boring text inputs.
+     */
     public function enqueue_admin_assets($hook) {
         if (!in_array($hook, ['post.php', 'post-new.php', 'agency-manager_page_agency-settings'])) return;
         wp_enqueue_media();
@@ -82,12 +116,22 @@ class Agency_Service_Manager {
         wp_enqueue_script('wp-color-picker');
     }
 
+    /**
+     * Public assets.
+     * This pushes our dynamic CSS (from the settings page) into the head of the site.
+     */
     public function enqueue_public_assets() {
         add_action('wp_head', function() {
             echo '<style>' . $this->get_ui_styles() . '</style>';
         });
     }
 
+    /**
+     * Post Type Registration.
+     * Creating 'Services' and 'Projects'. 
+     * Note: Projects now has 'show_in_rest' => true so we can use Gutenberg, 
+     * because writing in the classic editor feels like using a typewriter in a Tesla.
+     */
     public function register_post_types() {
         register_post_type('agency_service', [
             'labels' => ['name' => 'Services', 'singular_name' => 'Service'],
@@ -110,6 +154,10 @@ class Agency_Service_Manager {
         ]);
     }
 
+    /**
+     * Taxonomy Registration.
+     * Industries help us categorize projects. It's essentially "Tags" but fancier.
+     */
     public function register_taxonomies() {
         register_taxonomy('project_industry', 'agency_project', [
             'label' => 'Industries',
@@ -119,10 +167,20 @@ class Agency_Service_Manager {
         ]);
     }
 
+    /**
+     * Creating the Admin Menu.
+     * Adding a dedicated "Agency Manager" spot in the sidebar so it's easy to find.
+     */
     public function add_plugin_settings_menu() {
         add_menu_page('Agency Manager', 'Agency Manager', 'manage_options', 'agency-settings', [$this, 'render_settings_page'], 'dashicons-admin-generic');
     }
 
+    /**
+     * Settings Registration.
+     * Here we define all the knobs and dials the user can turn—colors, fonts, radii.
+     * If a setting doesn't exist yet, we update it with a default so the site 
+     * doesn't look broken on the first install.
+     */
     public function register_settings() {
         $defaults = [
             'agency_font_main' => 'sans-serif',
@@ -148,10 +206,18 @@ class Agency_Service_Manager {
         }
     }
 
+    /**
+     * The CSS Engine.
+     * This monster function pulls everything from the database and turns it into 
+     * CSS variables. It's the reason why changing a color in the admin panel 
+     * actually does something on the front end. 
+     */
     private function get_ui_styles() {
         $ff = get_option('agency_font_main');
         $custom_fonts = get_option('agency_custom_fonts', []);
         $font_face = "";
+        
+        // Handling those custom fonts we fought WordPress to upload earlier
         foreach($custom_fonts as $f) {
             $name = pathinfo($f['url'], PATHINFO_FILENAME);
             $ext = pathinfo($f['url'], PATHINFO_EXTENSION);
@@ -198,6 +264,11 @@ class Agency_Service_Manager {
         ";
     }
 
+    /**
+     * Admin Settings Page Renderer.
+     * This is the HTML for the dashboard settings. It uses a 2-column grid 
+     * because we aren't savages and we appreciate a bit of organization.
+     */
     public function render_settings_page() {
         ?>
         <div class="wrap agency-admin-wrap">
@@ -232,11 +303,20 @@ class Agency_Service_Manager {
         <?php
     }
 
+    /**
+     * Metabox Setup.
+     * Adding the extra input fields to the individual Post and Service editors.
+     */
     public function add_agency_meta_boxes() {
         add_meta_box('project_details', 'Project Details', [$this, 'render_project_metabox'], 'agency_project', 'normal', 'high');
         add_meta_box('service_details', 'Service Details', [$this, 'render_service_metabox'], 'agency_service', 'normal', 'high');
     }
 
+    /**
+     * Project Metabox HTML.
+     * This is where you link a project to a service. If you don't link it, 
+     * the frontend filtering will just ignore it. Consider yourself warned.
+     */
     public function render_project_metabox($post) {
         $seo = get_post_meta($post->ID, '_project_seo_caption', true);
         $url = get_post_meta($post->ID, '_project_live_url', true);
@@ -256,6 +336,11 @@ class Agency_Service_Manager {
         <?php
     }
 
+    /**
+     * Service Metabox HTML.
+     * Here's that custom link you asked for. It allows the 'Explore' button 
+     * to take users anywhere you want—even off-site.
+     */
     public function render_service_metabox($post) {
         $seo = get_post_meta($post->ID, '_service_seo_paragraph', true);
         $custom_link = get_post_meta($post->ID, '_service_custom_link', true);
@@ -268,6 +353,11 @@ class Agency_Service_Manager {
         <?php
     }
 
+    /**
+     * Data Saver.
+     * The heavy lifting of actually putting the metabox data into the database.
+     * We use nonces here to make sure someone isn't spoofing the save request.
+     */
     public function save_agency_meta($post_id) {
         if (!isset($_POST['ag_nonce']) || !wp_verify_nonce($_POST['ag_nonce'], 'save_ag_meta')) return;
         if (get_post_type($post_id) === 'agency_project') {
@@ -280,6 +370,12 @@ class Agency_Service_Manager {
         }
     }
 
+    /**
+     * Projects Grid Shortcode.
+     * Renders the project archive with Industry and Service filters.
+     * It uses a mix of PHP and a little bit of jQuery to handle the filtering.
+     * It's fast because we don't reload the page—we just hide the stuff we don't want.
+     */
     public function render_projects_grid() {
         ob_start(); 
         $industries = get_terms(['taxonomy' => 'project_industry', 'hide_empty' => true]);
@@ -288,6 +384,7 @@ class Agency_Service_Manager {
         ?>
         <div class="agency-portfolio-container" id="ag-project-archive">
             <div class="archive-filters" style="margin-bottom: 50px;">
+                <!-- Industry Filters -->
                 <div class="filter-section">
                     <div class="filter-title">Filter by Industry</div>
                     <div class="filter-nav industry-nav">
@@ -298,6 +395,7 @@ class Agency_Service_Manager {
                     </div>
                 </div>
 
+                <!-- Service Filters -->
                 <div class="filter-section">
                     <div class="filter-title">Filter by Service</div>
                     <div class="filter-nav service-nav">
@@ -338,6 +436,11 @@ class Agency_Service_Manager {
         </div>
 
         <script>
+        /**
+         * The JS Filter logic.
+         * We track the 'active' state of both industry and service filters.
+         * If an item matches both, it stays visible. If not, it disappears.
+         */
         jQuery(document).ready(function($){
             var activeIndustry = 'all';
             var activeService = 'all';
@@ -364,11 +467,9 @@ class Agency_Service_Manager {
                 var type = $btn.data('filter-type');
                 var val = $btn.data('value');
 
-                // Update UI state
                 $btn.closest('.filter-nav').find('.filter-btn').removeClass('active');
                 $btn.addClass('active');
 
-                // Update Logic state
                 if(type === 'industry') activeIndustry = val;
                 if(type === 'service') activeService = val;
 
@@ -379,6 +480,12 @@ class Agency_Service_Manager {
         <?php return ob_get_clean();
     }
 
+    /**
+     * Services Archive Shortcode.
+     * Displays all services in a clean grid.
+     * This checks for that custom link we added earlier. If it exists, we send 
+     * the user there. If not, we send them to the internal single service page.
+     */
     public function render_services_archive() {
         ob_start(); 
         $explore_txt = get_option('explore_btn_text');
@@ -410,6 +517,12 @@ class Agency_Service_Manager {
         <?php return ob_get_clean();
     }
 
+    /**
+     * The Template Interceptor.
+     * If someone clicks a project or service, this function kills the default 
+     * WordPress template loading and forces it to use our custom internal renderer.
+     * It's a bit of a power move, but it ensures the layout is always perfect.
+     */
     public function template_loader($template) {
         if (is_singular(['agency_service', 'agency_project'])) {
             add_action('wp_footer', function() { exit; }); 
@@ -419,6 +532,13 @@ class Agency_Service_Manager {
         return $template;
     }
 
+    /**
+     * Single Page Renderer.
+     * This is the HTML for the internal "view details" page.
+     * It features a main content area and a sidebar with recent items.
+     * We use 'get_header()' and 'get_footer()' so the site menu and footer 
+     * still appear, otherwise it would just be a floating box.
+     */
     private function render_single_page() {
         get_header(); 
         $start_txt = get_option('contact_btn_text');
@@ -448,4 +568,5 @@ class Agency_Service_Manager {
         <?php get_footer();
     }
 }
+// Actually instantiate the class. If we don't do this, the code is just text.
 new Agency_Service_Manager();
