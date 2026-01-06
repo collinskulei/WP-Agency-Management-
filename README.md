@@ -36,7 +36,7 @@ Set your primary colors (buttons/titles) and secondary colors (body text).
 
 (Optional) Upload custom fonts to your Media Library and paste the URL in the typography section if you want to get fancy.
 
-Set your Contact URL—this is where your "Get Started" buttons will point.
+Set your Contact URL this is where your "Get Started" buttons will point.
 
 3. Adding Services
 
